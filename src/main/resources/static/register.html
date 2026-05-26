@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register - ShopHub</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="topBar"></div>
+  <nav id="navbar"></nav>
+
+  <div class="auth-page">
+    <div class="auth-visual">
+      <div class="auth-visual-content">
+        <h2>Join ShopHub Today</h2>
+        <p>Create your free account and start shopping from thousands of quality products with fast delivery.</p>
+        <ul class="auth-visual-features">
+          <li>🎁 Welcome bonus on first order</li>
+          <li>🚚 Free shipping over $50</li>
+          <li>⭐ Earn rewards on every purchase</li>
+          <li>🔐 Your data is always protected</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="auth-form-side">
+      <div class="form-card">
+        <h2>Create Account</h2>
+        <p class="subtitle">It only takes a minute</p>
+        <div id="alertBox"></div>
+
+        <form id="registerForm">
+          <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" id="fullName" required placeholder="John Doe">
+          </div>
+          <div class="form-group">
+            <label>Email Address</label>
+            <input type="email" id="email" required placeholder="you@email.com">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="password" required minlength="6" placeholder="Min 6 characters">
+          </div>
+          <button type="submit" class="btn btn-accent btn-block">Create My Account</button>
+        </form>
+
+        <p class="form-footer">Already have an account? <a href="login.html">Sign in</a></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/ui.js"></script>
+  <script>
+    initLayout();
+    renderNavbar('register');
+    if (Auth.isLoggedIn()) window.location.href = 'index.html';
+
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const data = await api('/api/auth/register', {
+          method: 'POST',
+          body: JSON.stringify({
+            fullName: document.getElementById('fullName').value,
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value,
+          }),
+        });
+        Auth.setSession(data);
+        showToast('Account created! Welcome to ShopHub 🎉');
+        setTimeout(() => window.location.href = 'index.html', 800);
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    });
+  </script>
+</body>
+</html>

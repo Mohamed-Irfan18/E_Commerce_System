@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - ShopHub</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="topBar"></div>
+  <nav id="navbar"></nav>
+
+  <div class="page-banner">
+    <h1>⚙️ Admin Dashboard</h1>
+    <p>Manage products, categories & orders</p>
+  </div>
+
+  <div class="container page-content">
+
+    <div id="alertBox"></div>
+
+    <div class="admin-tabs">
+      <button class="tab-btn active" data-tab="products">Products</button>
+      <button class="tab-btn" data-tab="categories">Categories</button>
+      <button class="tab-btn" data-tab="orders">Orders</button>
+    </div>
+
+    <!-- Products Tab -->
+    <div id="tab-products" class="tab-panel active">
+      <div class="admin-form">
+        <h3 id="productFormTitle">Add Product</h3>
+        <form id="productForm">
+          <input type="hidden" id="productId">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Name</label>
+              <input type="text" id="pName" required>
+            </div>
+            <div class="form-group">
+              <label>Price</label>
+              <input type="number" id="pPrice" step="0.01" min="0.01" required>
+            </div>
+            <div class="form-group">
+              <label>Stock</label>
+              <input type="number" id="pStock" min="0" required>
+            </div>
+            <div class="form-group">
+              <label>Category</label>
+              <select id="pCategory" required></select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <textarea id="pDesc" rows="2"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Image URL</label>
+            <input type="url" id="pImage" placeholder="https://...">
+          </div>
+          <button type="submit" class="btn btn-primary">Save Product</button>
+          <button type="button" class="btn btn-outline" id="cancelProductEdit" style="margin-left:0.5rem">Cancel</button>
+        </form>
+      </div>
+      <div id="adminProducts" class="loading">Loading...</div>
+    </div>
+
+    <!-- Categories Tab -->
+    <div id="tab-categories" class="tab-panel">
+      <div class="admin-form">
+        <h3>Add Category</h3>
+        <form id="categoryForm">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Name</label>
+              <input type="text" id="cName" required>
+            </div>
+            <div class="form-group">
+              <label>Description</label>
+              <input type="text" id="cDesc">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">Add Category</button>
+        </form>
+      </div>
+      <div id="adminCategories" class="loading">Loading...</div>
+    </div>
+
+    <!-- Orders Tab -->
+    <div id="tab-orders" class="tab-panel">
+      <div id="adminOrders" class="loading">Loading...</div>
+    </div>
+  </div>
+
+  <div id="footer"></div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/ui.js"></script>
+  <script>
+    initLayout();
+    renderNavbar('admin');
+    requireAdmin();
+
+    let categories = [];
+    let productsCache = [];
+    let editingProductId = null;
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    async function loadCategories() {
+      categories = await api('/api/categories');
+      const select = document.getElementById('pCategory');
+      select.innerHTML = categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+      document.getElementById('adminCategories').innerHTML = `
+        <div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>Name</th><th>Description</th><th></th></tr></thead>
+          <tbody>${categories.map(c => `
+            <tr>
+              <td>${c.id}</td><td>${c.name}</td><td>${c.description || '-'}</td>
+              <td><button class="btn btn-danger btn-sm" onclick="deleteCategory(${c.id})">Delete</button></td>
+            </tr>
+          `).join('')}</tbody>
+        </table></div>`;
+    }
+
+    async function loadProducts() {
+      productsCache = await api('/api/products');
+      document.getElementById('adminProducts').innerHTML = `
+        <div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>Name</th><th>Price</th><th>Stock</th><th>Category</th><th></th></tr></thead>
+          <tbody>${productsCache.map(p => `
+            <tr>
+              <td>${p.id}</td><td>${p.name}</td><td>${formatPrice(p.price)}</td>
+              <td>${p.stock}</td><td>${p.categoryName}</td>
+              <td>
+                <button class="btn btn-outline btn-sm" onclick="editProduct(${p.id})">Edit</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})">Delete</button>
+              </td>
+            </tr>
+          `).join('')}</tbody>
+        </table></div>`;
+    }
+
+    function editProduct(id) {
+      const p = productsCache.find(x => x.id === id);
+      if (!p) return;
+      editingProductId = p.id;
+      document.getElementById('productFormTitle').textContent = 'Edit Product';
+      document.getElementById('pName').value = p.name;
+      document.getElementById('pPrice').value = p.price;
+      document.getElementById('pStock').value = p.stock;
+      document.getElementById('pCategory').value = p.categoryId;
+      document.getElementById('pDesc').value = p.description || '';
+      document.getElementById('pImage').value = p.imageUrl || '';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    document.getElementById('cancelProductEdit').addEventListener('click', () => {
+      editingProductId = null;
+      document.getElementById('productFormTitle').textContent = 'Add Product';
+      document.getElementById('productForm').reset();
+    });
+
+    document.getElementById('productForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const body = {
+        name: document.getElementById('pName').value,
+        price: parseFloat(document.getElementById('pPrice').value),
+        stock: parseInt(document.getElementById('pStock').value),
+        categoryId: parseInt(document.getElementById('pCategory').value),
+        description: document.getElementById('pDesc').value,
+        imageUrl: document.getElementById('pImage').value,
+      };
+      try {
+        if (editingProductId) {
+          await api(`/api/admin/products/${editingProductId}`, { method: 'PUT', body: JSON.stringify(body) });
+          showAlert('alertBox', 'Product updated!', 'success');
+        } else {
+          await api('/api/admin/products', { method: 'POST', body: JSON.stringify(body) });
+          showAlert('alertBox', 'Product created!', 'success');
+        }
+        editingProductId = null;
+        document.getElementById('productForm').reset();
+        document.getElementById('productFormTitle').textContent = 'Add Product';
+        loadProducts();
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    });
+
+    document.getElementById('categoryForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await api('/api/admin/categories', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: document.getElementById('cName').value,
+            description: document.getElementById('cDesc').value,
+          }),
+        });
+        showAlert('alertBox', 'Category added!', 'success');
+        document.getElementById('categoryForm').reset();
+        loadCategories();
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    });
+
+    async function deleteProduct(id) {
+      if (!confirm('Delete this product?')) return;
+      try {
+        await api(`/api/admin/products/${id}`, { method: 'DELETE' });
+        loadProducts();
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    }
+
+    async function deleteCategory(id) {
+      if (!confirm('Delete this category?')) return;
+      try {
+        await api(`/api/admin/categories/${id}`, { method: 'DELETE' });
+        loadCategories();
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    }
+
+    async function loadAdminOrders() {
+      const orders = await api('/api/admin/orders');
+      const area = document.getElementById('adminOrders');
+
+      if (!orders.length) {
+        area.innerHTML = '<div class="empty-state"><h3>No orders</h3></div>';
+        return;
+      }
+
+      area.innerHTML = orders.map(order => `
+        <div class="order-card">
+          <div class="order-header">
+            <strong>Order #${order.id}</strong>
+            <span class="status ${order.status}">${order.status}</span>
+          </div>
+          <p style="color:var(--muted);font-size:0.85rem">${order.shippingAddress}</p>
+          <p style="margin:0.5rem 0">Total: <strong>${formatPrice(order.totalAmount)}</strong></p>
+          <div class="form-group" style="margin-top:0.75rem">
+            <label>Update Status</label>
+            <select onchange="updateOrderStatus(${order.id}, this.value)">
+              ${['PENDING','CONFIRMED','SHIPPED','DELIVERED','CANCELLED'].map(s =>
+                `<option value="${s}" ${s === order.status ? 'selected' : ''}>${s}</option>`
+              ).join('')}
+            </select>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function updateOrderStatus(id, status) {
+      try {
+        await api(`/api/admin/orders/${id}/status?status=${status}`, { method: 'PATCH' });
+        showAlert('alertBox', 'Order status updated!', 'success');
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    }
+
+    loadCategories();
+    loadProducts();
+    loadAdminOrders();
+  </script>
+</body>
+</html>

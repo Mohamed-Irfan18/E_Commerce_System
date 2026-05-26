@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shopping Cart - ShopHub</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="topBar"></div>
+  <nav id="navbar"></nav>
+
+  <div class="page-banner">
+    <h1>🛒 Shopping Cart</h1>
+    <p>Review your items and proceed to checkout</p>
+  </div>
+
+  <div class="container page-content">
+    <div id="alertBox"></div>
+    <div id="cartArea" class="loading">Loading cart...</div>
+
+    <div id="checkoutSection" class="hidden cart-layout">
+      <div class="cart-items-card">
+        <h3>Your Items (<span id="itemCount">0</span>)</h3>
+        <div id="cartItemsTable"></div>
+      </div>
+      <div class="checkout-card">
+        <h3>Order Summary</h3>
+        <div class="order-summary-row"><span>Subtotal</span><span id="subtotalAmt">$0.00</span></div>
+        <div class="order-summary-row"><span>Shipping</span><span id="shippingAmt">FREE</span></div>
+        <div class="order-summary-row"><span>Tax</span><span id="taxAmt">$0.00</span></div>
+        <div class="order-summary-row total"><span>Total</span><span id="totalAmt">$0.00</span></div>
+        <form id="checkoutForm" style="margin-top:1.5rem">
+          <div class="form-group">
+            <label>📍 Shipping Address</label>
+            <textarea id="shippingAddress" rows="3" required placeholder="123 Main St, City, State, Country"></textarea>
+          </div>
+          <button type="submit" class="btn btn-accent btn-block">🔒 Place Order Securely</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="footer"></div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/ui.js"></script>
+  <script>
+    initLayout();
+    renderNavbar('cart');
+    requireAuth();
+
+    let cartData = null;
+
+    async function loadCart() {
+      const area = document.getElementById('cartArea');
+      const checkout = document.getElementById('checkoutSection');
+
+      try {
+        cartData = await api('/api/cart');
+
+        if (!cartData.items || cartData.items.length === 0) {
+          area.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">🛒</div>
+              <h3>Your cart is empty</h3>
+              <p>Looks like you haven't added anything yet.</p>
+              <a href="index.html" class="btn btn-accent">Start Shopping</a>
+            </div>`;
+          checkout.classList.add('hidden');
+          area.classList.remove('hidden');
+          return;
+        }
+
+        area.classList.add('hidden');
+        checkout.classList.remove('hidden');
+
+        document.getElementById('itemCount').textContent = cartData.items.length;
+        const subtotal = parseFloat(cartData.totalAmount);
+        const tax = subtotal * 0.05;
+        const total = subtotal + tax;
+
+        document.getElementById('subtotalAmt').textContent = formatPrice(subtotal);
+        document.getElementById('taxAmt').textContent = formatPrice(tax);
+        document.getElementById('totalAmt').textContent = formatPrice(total);
+
+        document.getElementById('cartItemsTable').innerHTML = `
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Product</th><th>Price</th><th>Qty</th><th>Subtotal</th><th></th></tr></thead>
+              <tbody>
+                ${cartData.items.map(item => `
+                  <tr>
+                    <td>
+                      <div class="cart-product-cell">
+                        <img src="${getProductImage({ name: item.productName, imageUrl: '' })}" alt="${item.productName}">
+                        <strong>${item.productName}</strong>
+                      </div>
+                    </td>
+                    <td>${formatPrice(item.unitPrice)}</td>
+                    <td>
+                      <div class="qty-control">
+                        <button onclick="updateQty(${item.id}, ${item.quantity - 1})">−</button>
+                        <span>${item.quantity}</span>
+                        <button onclick="updateQty(${item.id}, ${item.quantity + 1})">+</button>
+                      </div>
+                    </td>
+                    <td><strong>${formatPrice(item.subtotal)}</strong></td>
+                    <td><button class="btn btn-danger btn-sm" onclick="removeItem(${item.id})">✕</button></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      } catch (err) {
+        area.classList.remove('hidden');
+        area.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+      }
+    }
+
+    async function updateQty(itemId, qty) {
+      try {
+        await api(`/api/cart/items/${itemId}?quantity=${qty}`, { method: 'PUT' });
+        loadCart();
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    }
+
+    async function removeItem(itemId) {
+      try {
+        await api(`/api/cart/items/${itemId}`, { method: 'DELETE' });
+        showToast('Item removed from cart');
+        loadCart();
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    }
+
+    document.getElementById('checkoutForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const order = await api('/api/orders', {
+          method: 'POST',
+          body: JSON.stringify({ shippingAddress: document.getElementById('shippingAddress').value }),
+        });
+        showToast(`Order #${order.id} placed successfully! 🎉`);
+        setTimeout(() => window.location.href = 'orders.html', 1500);
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    });
+
+    loadCart();
+  </script>
+</body>
+</html>

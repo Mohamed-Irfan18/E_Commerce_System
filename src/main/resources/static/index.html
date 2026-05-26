@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShopHub - Online Shopping</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="topBar"></div>
+  <nav id="navbar"></nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-content">
+      <div class="hero-badge">✨ Summer Sale — Up to 40% Off</div>
+      <h1>Discover Amazing Products at Unbeatable Prices</h1>
+      <p>Shop the latest electronics, fashion trends, and bestseller books. Fast delivery & secure checkout guaranteed.</p>
+      <div class="hero-actions">
+        <a href="#products" class="btn btn-primary">Shop Now →</a>
+        <a href="register.html" class="btn btn-ghost">Create Free Account</a>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat"><strong>500+</strong><span>Products</span></div>
+        <div class="hero-stat"><strong>10K+</strong><span>Happy Customers</span></div>
+        <div class="hero-stat"><strong>4.8★</strong><span>Average Rating</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Categories -->
+  <section class="section" id="categories">
+    <div class="container">
+      <div class="section-header">
+        <h2>Shop by Category</h2>
+        <p>Find exactly what you're looking for</p>
+      </div>
+      <div class="category-grid" id="categoryGrid"></div>
+    </div>
+  </section>
+
+  <!-- Promo -->
+  <div class="container">
+    <div class="promo-banner">
+      <div>
+        <h3>⚡ Flash Sale — Limited Time!</h3>
+        <p>Extra 15% off on Electronics. Don't miss out!</p>
+      </div>
+      <div class="promo-timer">
+        <span>Ends in</span>
+        <strong id="countdown">02:45:30</strong>
+      </div>
+      <a href="#products" class="btn btn-primary">Grab Deals</a>
+    </div>
+  </div>
+
+  <!-- Products -->
+  <section class="section" id="products" style="padding-top:1rem">
+    <div class="container">
+      <div class="section-header left">
+        <h2>Featured Products</h2>
+        <p>Handpicked items just for you</p>
+      </div>
+
+      <div id="alertBox"></div>
+
+      <div class="filters-bar">
+        <input type="text" id="searchInput" placeholder="🔍  Search products...">
+        <select id="categoryFilter">
+          <option value="">All Categories</option>
+        </select>
+        <button class="btn btn-accent btn-sm" id="searchBtn">Search</button>
+      </div>
+
+      <div class="filter-chips" id="filterChips"></div>
+      <div id="productsArea" class="loading">Loading products...</div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <div class="container">
+    <div class="features-strip">
+      <div class="feature-item">
+        <div class="feature-icon">🚚</div>
+        <div><h4>Free Shipping</h4><p>On orders over $50</p></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">🔒</div>
+        <div><h4>Secure Payment</h4><p>100% protected checkout</p></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">↩️</div>
+        <div><h4>Easy Returns</h4><p>30-day return policy</p></div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">💬</div>
+        <div><h4>24/7 Support</h4><p>Dedicated customer care</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="footer"></div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/ui.js"></script>
+  <script>
+    initLayout();
+    renderNavbar('shop');
+
+    let categories = [];
+
+    // Countdown timer
+    function startCountdown() {
+      let total = 2 * 3600 + 45 * 60 + 30;
+      setInterval(() => {
+        if (total <= 0) return;
+        total--;
+        const h = String(Math.floor(total / 3600)).padStart(2, '0');
+        const m = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
+        const s = String(total % 60).padStart(2, '0');
+        const el = document.getElementById('countdown');
+        if (el) el.textContent = `${h}:${m}:${s}`;
+      }, 1000);
+    }
+    startCountdown();
+
+    async function loadCategories() {
+      categories = await api('/api/categories');
+      const select = document.getElementById('categoryFilter');
+      const grid = document.getElementById('categoryGrid');
+      const chips = document.getElementById('filterChips');
+
+      categories.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name;
+        select.appendChild(opt);
+      });
+
+      grid.innerHTML = categories.map(c => `
+        <div class="category-card" onclick="filterCategory(${c.id})">
+          <img src="${getCategoryImage(c.name)}" alt="${c.name}">
+          <div class="category-card-overlay">
+            <h3>${c.name}</h3>
+            <span>${c.description || 'Explore collection'}</span>
+          </div>
+        </div>
+      `).join('');
+
+      chips.innerHTML = `<button class="chip active" onclick="filterCategory('')">All</button>` +
+        categories.map(c =>
+          `<button class="chip" data-id="${c.id}" onclick="filterCategory(${c.id})">${c.name}</button>`
+        ).join('');
+    }
+
+    function filterCategory(id) {
+      document.getElementById('categoryFilter').value = id;
+      document.querySelectorAll('.chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.id == id || (!id && !c.dataset.id));
+      });
+      loadProducts();
+      document.getElementById('products').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function loadProducts() {
+      const area = document.getElementById('productsArea');
+      area.innerHTML = '<div class="loading">Loading products...</div>';
+
+      const search = document.getElementById('searchInput').value.trim();
+      const categoryId = document.getElementById('categoryFilter').value;
+
+      let url = '/api/products?';
+      if (categoryId) url += `categoryId=${categoryId}`;
+      else if (search) url += `search=${encodeURIComponent(search)}`;
+
+      try {
+        const products = await api(url);
+        if (!products.length) {
+          area.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><h3>No products found</h3><p>Try a different search or category.</p><a href="index.html" class="btn btn-accent">View All</a></div>';
+          return;
+        }
+
+        area.innerHTML = `<div class="product-grid">${products.map((p, i) => {
+          const { rating, reviews } = fakeRating(p.name);
+          const oldPrice = (parseFloat(p.price) * 1.25).toFixed(2);
+          const badge = i === 0 ? 'Best Seller' : i === 1 ? 'Hot Deal' : p.stock < 15 ? 'Low Stock' : '';
+          return `
+          <div class="product-card">
+            ${badge ? `<span class="product-badge">${badge}</span>` : ''}
+            <div class="product-img-wrap">
+              <img src="${getProductImage(p)}" alt="${p.name}" loading="lazy">
+              <button class="product-wishlist" title="Add to wishlist">♡</button>
+            </div>
+            <div class="product-body">
+              <div class="product-category">${p.categoryName}</div>
+              <div class="product-name">${p.name}</div>
+              <div class="product-rating">
+                <span class="stars">${renderStars(parseFloat(rating))}</span>
+                <strong>${rating}</strong>
+                <span class="rating-count">(${reviews})</span>
+              </div>
+              <div class="product-desc">${p.description || ''}</div>
+              <div class="product-footer">
+                <div>
+                  <div class="product-price">${formatPrice(p.price)}<span class="old">${formatPrice(oldPrice)}</span></div>
+                  <div class="stock-tag ${p.stock < 10 ? 'low' : ''}">${p.stock > 0 ? '✓ ' + p.stock + ' in stock' : 'Out of stock'}</div>
+                </div>
+              </div>
+              <button class="btn btn-accent btn-sm add-cart-btn" onclick="addToCart(${p.id})" ${p.stock === 0 ? 'disabled' : ''}>
+                🛒 Add to Cart
+              </button>
+            </div>
+          </div>`;
+        }).join('')}</div>`;
+      } catch (err) {
+        area.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+      }
+    }
+
+    async function addToCart(productId) {
+      if (!Auth.isLoggedIn()) {
+        window.location.href = 'login.html?redirect=index.html';
+        return;
+      }
+      try {
+        await api('/api/cart/items', {
+          method: 'POST',
+          body: JSON.stringify({ productId, quantity: 1 }),
+        });
+        showToast('Added to cart! 🛒');
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    }
+
+    document.getElementById('searchBtn').addEventListener('click', loadProducts);
+    document.getElementById('searchInput').addEventListener('keypress', e => {
+      if (e.key === 'Enter') loadProducts();
+    });
+    document.getElementById('categoryFilter').addEventListener('change', loadProducts);
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('search')) {
+      document.getElementById('searchInput').value = params.get('search');
+    }
+
+    loadCategories().then(loadProducts);
+  </script>
+</body>
+</html>
