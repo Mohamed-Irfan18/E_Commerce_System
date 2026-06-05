@@ -1,16 +1,16 @@
 # E-Commerce System
 
-A full-stack **REST API** e-commerce backend built with **Java 17**, **Spring Boot 3**, **Spring Security (JWT)**, **Spring Data JPA**, and **SQL** (H2 or MySQL).
+Live Demo:
+https://e-commerce-system-93st.onrender.com
 
-## Features
-
-- **Web frontend** — Shop, cart, checkout, orders, and admin panel in the browser
-- User registration & login (JWT authentication)
-- Browse products & categories (public)
-- Shopping cart (add, update, remove items)
-- Place orders with stock management
-- Admin panel: manage products, categories, and order status
-
+Tech Stack:
+- Java 17
+- Spring Boot
+- Spring Security
+- JWT
+- H2 Database
+- Docker
+- Render
 ## Tech Stack
 
 | Layer        | Technology              |
